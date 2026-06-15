@@ -1,4 +1,4 @@
-<img width="634" height="590" alt="image" src="https://github.com/user-attachments/assets/cb5cb457-ec6e-433b-b4f1-a001b77c8b5e" />
+<img width="1254" height="581" alt="image" src="https://github.com/user-attachments/assets/5689f0a8-e929-454e-b348-39af14f7647d" />
 
 # AI-WAF-Python
 
