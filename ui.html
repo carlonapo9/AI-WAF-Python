@@ -1,0 +1,858 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AI-WAF Dashboard</title>
+<style>
+  :root {
+    --bg: #0a0c10;
+    --surface: #111318;
+    --surface2: #181b22;
+    --border: rgba(255,255,255,0.07);
+    --border-active: rgba(255,255,255,0.15);
+    --text: #e8eaf0;
+    --muted: #6b7280;
+    --accent: #4f7fff;
+    --accent-dim: rgba(79,127,255,0.12);
+    --red: #ef4444;
+    --red-dim: rgba(239,68,68,0.12);
+    --amber: #f59e0b;
+    --amber-dim: rgba(245,158,11,0.12);
+    --green: #22c55e;
+    --green-dim: rgba(34,197,94,0.12);
+    --purple: #a78bfa;
+    --purple-dim: rgba(167,139,250,0.12);
+    --radius: 10px;
+    --mono: 'JetBrains Mono', 'Fira Code', 'Cascadia Code', monospace;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, 'Inter', sans-serif;
+    font-size: 14px;
+    line-height: 1.6;
+    min-height: 100vh;
+  }
+
+  /* Layout */
+  .shell { display: flex; min-height: 100vh; }
+
+  .sidebar {
+    width: 220px;
+    min-width: 220px;
+    background: var(--surface);
+    border-right: 0.5px solid var(--border);
+    padding: 24px 0;
+    display: flex;
+    flex-direction: column;
+    position: sticky;
+    top: 0;
+    height: 100vh;
+  }
+
+  .logo {
+    padding: 0 20px 24px;
+    border-bottom: 0.5px solid var(--border);
+    margin-bottom: 16px;
+  }
+
+  .logo-mark {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .logo-icon {
+    width: 28px; height: 28px;
+    background: var(--accent);
+    border-radius: 7px;
+    display: flex; align-items: center; justify-content: center;
+  }
+
+  .logo-icon svg { width: 16px; height: 16px; fill: white; }
+  .logo-name { font-size: 15px; font-weight: 600; letter-spacing: -0.3px; }
+  .logo-version { font-size: 10px; color: var(--muted); margin-top: 2px; }
+
+  .nav-section {
+    padding: 0 12px;
+    margin-bottom: 8px;
+  }
+
+  .nav-label {
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--muted);
+    padding: 0 8px;
+    margin-bottom: 4px;
+  }
+
+  .nav-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 7px 8px;
+    border-radius: 7px;
+    cursor: pointer;
+    color: var(--muted);
+    font-size: 13px;
+    transition: all 0.15s;
+    border: none;
+    background: none;
+    width: 100%;
+    text-align: left;
+  }
+
+  .nav-item:hover { background: var(--surface2); color: var(--text); }
+  .nav-item.active { background: var(--accent-dim); color: var(--accent); }
+
+  .nav-item svg { width: 15px; height: 15px; flex-shrink: 0; }
+
+  .main { flex: 1; overflow-x: hidden; }
+
+  .topbar {
+    background: var(--surface);
+    border-bottom: 0.5px solid var(--border);
+    padding: 14px 28px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    position: sticky;
+    top: 0;
+    z-index: 10;
+  }
+
+  .topbar-title { font-size: 15px; font-weight: 500; }
+  .topbar-right { display: flex; align-items: center; gap: 10px; }
+
+  .status-badge {
+    display: flex; align-items: center; gap: 6px;
+    font-size: 12px; color: var(--green);
+    background: var(--green-dim);
+    padding: 4px 10px; border-radius: 20px;
+  }
+
+  .status-dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+  .status-dot.pulse { animation: pulse 2s infinite; }
+
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.3; }
+  }
+
+  .content { padding: 28px; }
+
+  /* Cards */
+  .card {
+    background: var(--surface);
+    border: 0.5px solid var(--border);
+    border-radius: var(--radius);
+    padding: 20px;
+  }
+
+  .card-title {
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.07em;
+    color: var(--muted);
+    margin-bottom: 12px;
+  }
+
+  /* Stats row */
+  .stats-row {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 12px;
+    margin-bottom: 20px;
+  }
+
+  .stat-card {
+    background: var(--surface);
+    border: 0.5px solid var(--border);
+    border-radius: var(--radius);
+    padding: 16px 18px;
+  }
+
+  .stat-label { font-size: 11px; color: var(--muted); margin-bottom: 6px; }
+  .stat-value { font-size: 26px; font-weight: 600; line-height: 1; }
+  .stat-sub { font-size: 11px; color: var(--muted); margin-top: 4px; }
+
+  /* Scan panel */
+  .scan-panel {
+    background: var(--surface);
+    border: 0.5px solid var(--border);
+    border-radius: var(--radius);
+    padding: 20px;
+    margin-bottom: 20px;
+  }
+
+  .scan-row {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+  }
+
+  .scan-input {
+    flex: 1;
+    background: var(--surface2);
+    border: 0.5px solid var(--border-active);
+    border-radius: 8px;
+    padding: 10px 14px;
+    color: var(--text);
+    font-size: 13px;
+    font-family: var(--mono);
+    outline: none;
+    transition: border-color 0.15s;
+  }
+
+  .scan-input:focus { border-color: var(--accent); }
+  .scan-input::placeholder { color: var(--muted); }
+
+  .btn {
+    padding: 9px 18px;
+    border-radius: 8px;
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    border: none;
+    transition: all 0.15s;
+  }
+
+  .btn-primary { background: var(--accent); color: white; }
+  .btn-primary:hover { filter: brightness(1.1); }
+  .btn-primary:active { transform: scale(0.98); }
+  .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; filter: none; }
+
+  .btn-ghost {
+    background: var(--surface2);
+    color: var(--text);
+    border: 0.5px solid var(--border-active);
+  }
+
+  .btn-ghost:hover { border-color: var(--accent); color: var(--accent); }
+
+  /* Verdict chip */
+  .verdict {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 3px 10px;
+    border-radius: 20px;
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+
+  .verdict-BLOCK { background: var(--red-dim); color: var(--red); }
+  .verdict-FLAG { background: var(--amber-dim); color: var(--amber); }
+  .verdict-ALLOW { background: var(--green-dim); color: var(--green); }
+
+  /* Result panel */
+  .result-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    margin-top: 16px;
+  }
+
+  /* Log table */
+  .log-table { width: 100%; border-collapse: collapse; }
+  .log-table th {
+    text-align: left;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.07em;
+    color: var(--muted);
+    padding: 8px 12px;
+    border-bottom: 0.5px solid var(--border);
+  }
+  .log-table td {
+    padding: 10px 12px;
+    border-bottom: 0.5px solid var(--border);
+    font-size: 12px;
+    vertical-align: top;
+  }
+  .log-table tr:last-child td { border-bottom: none; }
+  .log-table tr:hover td { background: var(--surface2); }
+
+  .mono { font-family: var(--mono); font-size: 11px; color: var(--muted); }
+
+  /* Confidence bar */
+  .conf-bar-bg {
+    width: 80px; height: 4px;
+    background: var(--border);
+    border-radius: 2px;
+    display: inline-block;
+    vertical-align: middle;
+    margin-right: 6px;
+  }
+
+  .conf-bar-fill { height: 4px; border-radius: 2px; }
+
+  /* Attack type tags */
+  .atk-tag {
+    display: inline-block;
+    background: var(--purple-dim);
+    color: var(--purple);
+    font-size: 10px;
+    padding: 2px 7px;
+    border-radius: 4px;
+    margin: 2px 2px 0 0;
+  }
+
+  /* Inspect panel */
+  .inspect-fields {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    margin-bottom: 12px;
+  }
+
+  .field-label {
+    font-size: 11px;
+    color: var(--muted);
+    margin-bottom: 4px;
+  }
+
+  .field-input {
+    background: var(--surface2);
+    border: 0.5px solid var(--border-active);
+    border-radius: 7px;
+    padding: 8px 12px;
+    color: var(--text);
+    font-size: 12px;
+    font-family: var(--mono);
+    outline: none;
+    width: 100%;
+  }
+
+  .field-input:focus { border-color: var(--accent); }
+
+  textarea.field-input { resize: vertical; min-height: 60px; }
+
+  /* Tab bar */
+  .tabs {
+    display: flex;
+    gap: 2px;
+    border-bottom: 0.5px solid var(--border);
+    margin-bottom: 20px;
+  }
+
+  .tab {
+    padding: 8px 16px;
+    font-size: 13px;
+    color: var(--muted);
+    cursor: pointer;
+    border-bottom: 2px solid transparent;
+    margin-bottom: -0.5px;
+    background: none;
+    border-top: none;
+    border-left: none;
+    border-right: none;
+    transition: all 0.15s;
+  }
+
+  .tab:hover { color: var(--text); }
+  .tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+
+  /* Severity dot */
+  .sev { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
+  .sev-critical { background: var(--red); }
+  .sev-high { background: var(--amber); }
+  .sev-medium { background: #f97316; }
+  .sev-low { background: var(--green); }
+  .sev-none { background: var(--muted); }
+
+  /* Loading spinner */
+  .spinner {
+    width: 16px; height: 16px;
+    border: 2px solid var(--border-active);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: spin 0.6s linear infinite;
+    display: inline-block;
+    vertical-align: middle;
+  }
+
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* Header check grid */
+  .header-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 6px;
+  }
+
+  .header-row {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    padding: 8px 10px;
+    border-radius: 7px;
+    background: var(--surface2);
+    font-size: 12px;
+  }
+
+  .header-icon { margin-top: 2px; flex-shrink: 0; }
+
+  .reasoning-box {
+    background: var(--surface2);
+    border-left: 2px solid var(--accent);
+    padding: 10px 14px;
+    border-radius: 0 7px 7px 0;
+    font-size: 12px;
+    line-height: 1.7;
+    color: var(--text);
+    margin-top: 12px;
+  }
+
+  .remediation-box {
+    background: var(--amber-dim);
+    border-left: 2px solid var(--amber);
+    padding: 10px 14px;
+    border-radius: 0 7px 7px 0;
+    font-size: 12px;
+    line-height: 1.7;
+    color: var(--amber);
+    margin-top: 8px;
+  }
+
+  /* Empty state */
+  .empty {
+    text-align: center;
+    padding: 40px 20px;
+    color: var(--muted);
+    font-size: 13px;
+  }
+
+  .empty-icon { font-size: 32px; margin-bottom: 10px; opacity: 0.4; }
+
+  /* Section gap */
+  .gap { margin-bottom: 20px; }
+
+  /* Scrollable table wrapper */
+  .table-wrap { overflow-x: auto; }
+
+  .owasp-tag {
+    font-size: 10px;
+    background: var(--accent-dim);
+    color: var(--accent);
+    padding: 2px 6px;
+    border-radius: 4px;
+    display: inline-block;
+    margin-top: 3px;
+  }
+</style>
+</head>
+<body>
+
+<div class="shell">
+
+  <!-- Sidebar -->
+  <aside class="sidebar">
+    <div class="logo">
+      <div class="logo-mark">
+        <div class="logo-icon">
+          <svg viewBox="0 0 16 16"><path d="M8 1L1 5v6l7 4 7-4V5L8 1zm0 1.8l5.2 3-5.2 3-5.2-3 5.2-3zm-6 3.9l5 2.9v5.5L2 12V6.7zm7 8.4V9.7l5-2.9v5.5l-5 2.8z"/></svg>
+        </div>
+        <div>
+          <div class="logo-name">AI-WAF</div>
+          <div class="logo-version">v1.0 · AI-powered</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="nav-section">
+      <div class="nav-label">Analysis</div>
+      <button class="nav-item active" onclick="showTab('scan')">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="7" cy="7" r="5"/><path d="m11 11 3 3"/></svg>
+        URL scanner
+      </button>
+      <button class="nav-item" onclick="showTab('inspect')">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="3" width="12" height="10" rx="1"/><path d="M5 7h6M5 9h4"/></svg>
+        Request inspector
+      </button>
+      <button class="nav-item" onclick="showTab('log')">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M2 4h12M2 8h8M2 12h10"/></svg>
+        Event log
+      </button>
+    </div>
+
+    <div class="nav-section" style="margin-top: auto;">
+      <div class="nav-label">Config</div>
+      <div style="padding: 8px 8px; font-size: 11px; color: var(--muted);">
+        Backend
+        <div class="mono" style="margin-top: 2px;" id="waf-endpoint">localhost:8000</div>
+      </div>
+    </div>
+  </aside>
+
+  <!-- Main -->
+  <div class="main">
+    <div class="topbar">
+      <div class="topbar-title" id="page-title">URL scanner</div>
+      <div class="topbar-right">
+        <div class="status-badge">
+          <span class="status-dot pulse"></span>
+          WAF active
+        </div>
+        <button class="btn btn-ghost" onclick="clearLog()">Clear log</button>
+      </div>
+    </div>
+
+    <div class="content">
+
+      <!-- Stats row -->
+      <div class="stats-row">
+        <div class="stat-card">
+          <div class="stat-label">Total scanned</div>
+          <div class="stat-value" id="stat-total" style="color: var(--text)">0</div>
+          <div class="stat-sub">requests analysed</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Blocked</div>
+          <div class="stat-value" id="stat-block" style="color: var(--red)">0</div>
+          <div class="stat-sub">threats stopped</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Flagged</div>
+          <div class="stat-value" id="stat-flag" style="color: var(--amber)">0</div>
+          <div class="stat-sub">need review</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Allowed</div>
+          <div class="stat-value" id="stat-allow" style="color: var(--green)">0</div>
+          <div class="stat-sub">clean requests</div>
+        </div>
+      </div>
+
+      <!-- Scan tab -->
+      <div id="tab-scan">
+        <div class="scan-panel gap">
+          <div class="card-title">Scan a URL</div>
+          <div class="scan-row">
+            <input id="scan-url" class="scan-input" type="url" placeholder="https://example.com/page?id=1" />
+            <button class="btn btn-primary" id="scan-btn" onclick="doScan()">Scan</button>
+          </div>
+          <div style="font-size: 11px; color: var(--muted); margin-top: 8px;">
+            Fetches the URL, inspects HTTP headers, and runs reasoning-based threat analysis
+          </div>
+        </div>
+
+        <div id="scan-result" style="display:none;">
+          <!-- filled by JS -->
+        </div>
+      </div>
+
+      <!-- Inspect tab -->
+      <div id="tab-inspect" style="display:none;">
+        <div class="scan-panel gap">
+          <div class="card-title">Inspect a raw request</div>
+          <div class="inspect-fields">
+            <div>
+              <div class="field-label">Method</div>
+              <select class="field-input" id="insp-method" style="font-family: var(--mono);">
+                <option>GET</option><option>POST</option><option>PUT</option><option>DELETE</option>
+              </select>
+            </div>
+            <div>
+              <div class="field-label">Path</div>
+              <input class="field-input" id="insp-path" placeholder="/api/users?id=1" />
+            </div>
+            <div>
+              <div class="field-label">Source IP</div>
+              <input class="field-input" id="insp-ip" placeholder="10.0.0.1" value="10.0.0.1" />
+            </div>
+            <div>
+              <div class="field-label">User-Agent</div>
+              <input class="field-input" id="insp-ua" placeholder="Mozilla/5.0" />
+            </div>
+          </div>
+          <div style="margin-bottom: 10px;">
+            <div class="field-label">Request body (optional)</div>
+            <textarea class="field-input" id="insp-body" placeholder='{"username": "admin&apos; OR &apos;1&apos;=&apos;1"}'></textarea>
+          </div>
+          <button class="btn btn-primary" id="insp-btn" onclick="doInspect()">Inspect request</button>
+        </div>
+
+        <div id="inspect-result" style="display:none;"></div>
+      </div>
+
+      <!-- Log tab -->
+      <div id="tab-log" style="display:none;">
+        <div class="card">
+          <div class="card-title">Event log</div>
+          <div class="table-wrap">
+            <table class="log-table">
+              <thead>
+                <tr>
+                  <th>Time</th>
+                  <th>Type</th>
+                  <th>Target</th>
+                  <th>Verdict</th>
+                  <th>Severity</th>
+                  <th>Confidence</th>
+                  <th>Attack types</th>
+                </tr>
+              </thead>
+              <tbody id="log-body">
+                <tr>
+                  <td colspan="7">
+                    <div class="empty">
+                      <div class="empty-icon">◎</div>
+                      No events yet — run a scan or inspection
+                    </div>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<script>
+const WAF = 'http://localhost:8000';
+const stats = { total: 0, block: 0, flag: 0, allow: 0 };
+const logEntries = [];
+
+function showTab(name) {
+  ['scan','inspect','log'].forEach(t => {
+    document.getElementById('tab-' + t).style.display = t === name ? '' : 'none';
+  });
+  document.querySelectorAll('.nav-item').forEach((el, i) => el.classList.remove('active'));
+  event.currentTarget.classList.add('active');
+  const titles = { scan: 'URL scanner', inspect: 'Request inspector', log: 'Event log' };
+  document.getElementById('page-title').textContent = titles[name];
+}
+
+function updateStats(verdict) {
+  stats.total++;
+  if (verdict === 'BLOCK') stats.block++;
+  else if (verdict === 'FLAG') stats.flag++;
+  else stats.allow++;
+  document.getElementById('stat-total').textContent = stats.total;
+  document.getElementById('stat-block').textContent = stats.block;
+  document.getElementById('stat-flag').textContent = stats.flag;
+  document.getElementById('stat-allow').textContent = stats.allow;
+}
+
+function confBar(val) {
+  const color = val >= 80 ? 'var(--red)' : val >= 60 ? 'var(--amber)' : 'var(--green)';
+  return `<div class="conf-bar-bg"><div class="conf-bar-fill" style="width:${val}%;background:${color};"></div></div>${val}%`;
+}
+
+function verdictChip(v) {
+  return `<span class="verdict verdict-${v}">${v}</span>`;
+}
+
+function sevDot(s) {
+  return `<span class="sev sev-${s || 'none'}"></span> ${s || 'none'}`;
+}
+
+function renderResult(data, target) {
+  const a = data.llm_analysis || {};
+  const verdict = a.verdict || 'FLAG';
+  const missing = data.missing_headers || [];
+  const attacks = a.attack_types || [];
+
+  // Add to log
+  logEntries.unshift({
+    time: new Date().toLocaleTimeString(),
+    type: data.url ? 'URL scan' : 'Inspect',
+    target: target,
+    verdict,
+    severity: a.severity,
+    confidence: a.confidence,
+    attacks,
+  });
+  renderLog();
+  updateStats(verdict);
+
+  return `
+    <div class="card gap">
+      <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:14px;">
+        <div>
+          <span style="font-size:11px; color:var(--muted);">Target</span>
+          <div class="mono" style="margin-top:2px;">${target}</div>
+        </div>
+        ${verdictChip(verdict)}
+      </div>
+
+      <div class="result-grid">
+        <div>
+          <div class="field-label">Severity</div>
+          <div style="font-size:13px; margin-top:4px;">${sevDot(a.severity)}</div>
+        </div>
+        <div>
+          <div class="field-label">Confidence</div>
+          <div style="font-size:13px; margin-top:4px;">${confBar(a.confidence || 0)}</div>
+        </div>
+        <div>
+          <div class="field-label">Static pattern hits</div>
+          <div style="font-size:13px; margin-top:4px; color:${(data.static_hits || []).length ? 'var(--red)' : 'var(--muted)'}">
+            ${(data.static_hits || []).length} detected
+          </div>
+        </div>
+        <div>
+          <div class="field-label">Missing headers</div>
+          <div style="font-size:13px; margin-top:4px; color:${missing.length ? 'var(--amber)' : 'var(--muted)'}">
+            ${missing.length} of 6 required
+          </div>
+        </div>
+      </div>
+
+      ${attacks.length ? `
+        <div style="margin-top:12px;">
+          <div class="field-label" style="margin-bottom:5px;">Attack types detected</div>
+          ${attacks.map(t => `<span class="atk-tag">${t}</span>`).join('')}
+        </div>` : ''}
+
+      ${a.owasp_categories && a.owasp_categories.length ? `
+        <div style="margin-top:10px;">
+          ${a.owasp_categories.map(c => `<span class="owasp-tag">${c}</span>`).join(' ')}
+        </div>` : ''}
+
+      ${a.reasoning ? `
+        <div class="reasoning-box">
+          <div style="font-size:10px; color:var(--accent); margin-bottom:4px; text-transform:uppercase; letter-spacing:0.07em;">Reasoning</div>
+          ${a.reasoning}
+        </div>` : ''}
+
+      ${a.remediation ? `
+        <div class="remediation-box">
+          <div style="font-size:10px; margin-bottom:4px; text-transform:uppercase; letter-spacing:0.07em; opacity:0.7;">Remediation</div>
+          ${a.remediation}
+        </div>` : ''}
+
+      ${missing.length ? `
+        <div style="margin-top:16px;">
+          <div class="card-title">Missing security headers</div>
+          <div class="header-grid">
+            ${missing.map(h => `
+              <div class="header-row">
+                <span class="header-icon" style="color:var(--amber);">⚠</span>
+                <div>
+                  <div class="mono" style="color:var(--text);">${h.header}</div>
+                  <div style="color:var(--muted); font-size:11px; margin-top:2px;">${h.description}</div>
+                  <div style="color:var(--muted); font-size:10px; margin-top:2px;">Recommended: <span class="mono">${h.recommended}</span></div>
+                </div>
+              </div>`).join('')}
+          </div>
+        </div>` : ''}
+    </div>`;
+}
+
+async function doScan() {
+  const url = document.getElementById('scan-url').value.trim();
+  if (!url) return;
+  const btn = document.getElementById('scan-btn');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span>';
+  document.getElementById('scan-result').style.display = 'none';
+
+  try {
+    const resp = await fetch(`${WAF}/scan`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ url, method: 'GET' }),
+    });
+    const data = await resp.json();
+    document.getElementById('scan-result').innerHTML = renderResult(data, url);
+    document.getElementById('scan-result').style.display = '';
+  } catch (e) {
+    document.getElementById('scan-result').innerHTML = `
+      <div class="card" style="border-color:var(--red);">
+        <div style="color:var(--red); font-size:13px;">
+          ⚠ Could not reach the WAF backend at <span class="mono">${WAF}</span>.<br>
+          <span style="color:var(--muted);">Start the server with: <span class="mono">uvicorn waf:app --reload</span></span>
+        </div>
+      </div>`;
+    document.getElementById('scan-result').style.display = '';
+  }
+
+  btn.disabled = false;
+  btn.textContent = 'Scan';
+}
+
+async function doInspect() {
+  const path = document.getElementById('insp-path').value.trim() || '/';
+  const btn = document.getElementById('insp-btn');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span>';
+
+  const payload = {
+    method: document.getElementById('insp-method').value,
+    path,
+    source_ip: document.getElementById('insp-ip').value || '10.0.0.1',
+    headers: { 'user-agent': document.getElementById('insp-ua').value },
+    body: document.getElementById('insp-body').value,
+    query_params: {},
+  };
+
+  // Parse query params from path
+  if (path.includes('?')) {
+    const qs = path.split('?')[1];
+    qs.split('&').forEach(pair => {
+      const [k, v] = pair.split('=');
+      if (k) payload.query_params[k] = v || '';
+    });
+    payload.path = path.split('?')[0];
+  }
+
+  try {
+    const resp = await fetch(`${WAF}/inspect`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    const data = await resp.json();
+    document.getElementById('inspect-result').innerHTML = renderResult(data, path);
+    document.getElementById('inspect-result').style.display = '';
+  } catch (e) {
+    document.getElementById('inspect-result').innerHTML = `
+      <div class="card" style="border-color:var(--red);">
+        <div style="color:var(--red); font-size:13px;">
+          ⚠ WAF backend unreachable at <span class="mono">${WAF}</span>.<br>
+          <span style="color:var(--muted);">Start with: <span class="mono">uvicorn waf:app --reload</span></span>
+        </div>
+      </div>`;
+    document.getElementById('inspect-result').style.display = '';
+  }
+
+  btn.disabled = false;
+  btn.textContent = 'Inspect request';
+}
+
+function renderLog() {
+  if (!logEntries.length) return;
+  document.getElementById('log-body').innerHTML = logEntries.map(e => `
+    <tr>
+      <td class="mono">${e.time}</td>
+      <td style="color:var(--muted);">${e.type}</td>
+      <td class="mono" style="max-width:200px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${e.target}</td>
+      <td>${verdictChip(e.verdict)}</td>
+      <td>${sevDot(e.severity)}</td>
+      <td>${confBar(e.confidence || 0)}</td>
+      <td>${(e.attacks || []).map(t => `<span class="atk-tag">${t}</span>`).join('')}</td>
+    </tr>`).join('');
+}
+
+function clearLog() {
+  logEntries.length = 0;
+  ['total','block','flag','allow'].forEach(k => { stats[k] = 0; document.getElementById('stat-' + k).textContent = 0; });
+  document.getElementById('log-body').innerHTML = `<tr><td colspan="7"><div class="empty"><div class="empty-icon">◎</div>No events yet</div></td></tr>`;
+}
+
+document.getElementById('scan-url').addEventListener('keydown', e => { if (e.key === 'Enter') doScan(); });
+</script>
+</body>
+</html>
